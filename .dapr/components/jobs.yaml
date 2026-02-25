@@ -1,0 +1,23 @@
+# =============================================================================
+# Dapr Jobs API Component - Cron Binding
+# =============================================================================
+# This component configures Dapr to use cron bindings for scheduled operations.
+# Used for: Reminder delivery, recurring task generation
+#
+# Note: The cron binding checks every minute for jobs to trigger.
+# Each reminder creates a scheduled job that calls the callback endpoint.
+# =============================================================================
+
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: jobs
+  namespace: default
+spec:
+  type: bindings.cron
+  version: v1
+  metadata:
+  - name: schedule
+    value: "@every 1m"  # Check every minute for scheduled jobs
+  - name: direction
+    value: "input"

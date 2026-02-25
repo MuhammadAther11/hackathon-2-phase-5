@@ -1,0 +1,85 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phase3-mcp-backend"
+version = "0.1.0"
+description = "FastAPI backend with MCP tools for AI-powered task management"
+authors = [
+    {name = "Phase 3 Team", email = "team@phase3.dev"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+dependencies = [
+    "fastapi>=0.115.0",
+    "sqlalchemy>=2.0.23",
+    "sqlmodel>=0.0.14",
+    "asyncpg>=0.29.0",
+    "pydantic>=2.11.0",
+    "pydantic-settings>=2.5.2",
+    "python-multipart>=0.0.6",
+    "python-jose>=3.3.0",
+    "python-dotenv>=1.0.0",
+    "uvicorn>=0.24.0",
+    "mcp>=1.26.0",
+    "dapr==1.14.0",
+    "dapr-ext-fastapi==1.14.0",
+    "psycopg2-binary>=2.9.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==7.4.3",
+    "pytest-asyncio==0.21.1",
+    "httpx==0.25.1",
+    "black==23.11.0",
+    "isort==5.12.0",
+    "flake8==6.1.0",
+]
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: unit tests",
+    "integration: integration tests",
+    "contract: contract tests",
+    "asyncio: asyncio tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+asyncio_default_fixture_scope = "function"
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_gitignore = true
+known_first_party = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''

@@ -1,0 +1,217 @@
+version: '3.8'
+
+# =============================================================================
+# TaskFlow Phase V - Local Development with Dapr + Kafka
+# =============================================================================
+# This Docker Compose setup runs the complete Phase V stack locally:
+# - Backend (FastAPI) with Dapr sidecar
+# - Frontend (Next.js)
+# - Redpanda (Kafka-compatible event streaming)
+# - Dapr placement service (for actor runtime)
+# - Redis (for Dapr state store fallback)
+#
+# Usage:
+#   docker compose up -d              # Start all services
+#   docker compose logs -f            # View logs
+#   docker compose down               # Stop all services
+#   docker compose down -v            # Stop and remove volumes
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Backend API (FastAPI) with Dapr Sidecar
+  # ===========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: taskflow-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/taskflow}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev_secret_change_in_production}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - COHERE_API_KEY=${COHERE_API_KEY:-}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      # Dapr Configuration
+      - DAPR_HTTP_ENDPOINT=http://localhost:3500
+      - DAPR_GRPC_ENDPOINT=localhost:50001
+      - KAFKA_BROKERS=redpanda:9092
+      - DAPR_PUBSUB_NAME=pubsub
+      - DAPR_TOPIC_NAME=task-events
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+    depends_on:
+      - db
+      - redpanda
+    networks:
+      - taskflow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ===========================================================================
+  # Frontend (Next.js)
+  # ===========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: taskflow-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - taskflow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ===========================================================================
+  # Redpanda (Kafka-Compatible Event Streaming)
+  # ===========================================================================
+  # Redpanda is a Kafka-compatible event streaming platform without ZooKeeper
+  # Used for: Real-time sync, event sourcing, pub/sub messaging
+  # ===========================================================================
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.3.4
+    container_name: taskflow-redpanda
+    command:
+      - redpanda
+      - start
+      - --smp
+      - '1'
+      - --reserve-memory
+      - 0M
+      - --overprovisioned
+      - --node-id
+      - '0'
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:29092,OUTSIDE://redpanda:9092
+      - --pandaproxy-addr
+      - PLAINTEXT://0.0.0.0:28082,OUTSIDE://0.0.0.0:8082
+      - --advertise-pandaproxy-addr
+      - PLAINTEXT://redpanda:28082,OUTSIDE://redpanda:8082
+    ports:
+      - "9092:9092"    # Kafka API (outside)
+      - "8082:8082"    # Pandaproxy API (REST)
+      - "29092:29092"  # Kafka API (internal)
+      - "28082:28082"  # Pandaproxy API (internal)
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    networks:
+      - taskflow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/brokers"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ===========================================================================
+  # PostgreSQL Database (Local Development)
+  # ===========================================================================
+  # Optional: Use this for local dev instead of Neon PostgreSQL
+  # ===========================================================================
+  db:
+    image: postgres:15-alpine
+    container_name: taskflow-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=taskflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - taskflow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # Dapr Placement Service (Required for Dapr runtime)
+  # ===========================================================================
+  # Manages actor placement and service discovery
+  # ===========================================================================
+  dapr-placement:
+    image: daprio/dapr:1.13.0
+    container_name: taskflow-dapr-placement
+    command: ["./placement", "-port", "50005"]
+    ports:
+      - "50005:50005"
+    networks:
+      - taskflow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "50005"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===========================================================================
+  # Redis (Dapr State Store Fallback)
+  # ===========================================================================
+  # Used for Dapr state management and pub/sub backing store
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: taskflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - taskflow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ===========================================================================
+  # Dapr Sidecar Injector (Optional - for automatic sidecar injection)
+  # ===========================================================================
+  # Note: For local dev, we run Dapr sidecar manually with each service
+  # This is here for reference if you want to test K8s-style deployment
+  # ===========================================================================
+
+networks:
+  taskflow-network:
+    driver: bridge
+    name: taskflow-network
+
+volumes:
+  redpanda-data:
+    driver: local
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local

@@ -1,0 +1,449 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Chat API for Todo AI Chatbot",
+    "version": "1.0.0",
+    "description": "API endpoints for chatbot integration with natural language task management"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Development server"
+    }
+  ],
+  "paths": {
+    "/api/chat/message": {
+      "post": {
+        "summary": "Send message to AI agent",
+        "description": "User sends natural language message, AI agent processes and returns response with task operation results",
+        "operationId": "send_chat_message",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message_text"],
+                "properties": {
+                  "message_text": {
+                    "type": "string",
+                    "description": "User's natural language message",
+                    "minLength": 1,
+                    "maxLength": 5000,
+                    "example": "Add a task to buy groceries"
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "description": "Optional session ID to continue conversation (new session created if omitted)",
+                    "format": "uuid",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI agent response with task operation results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "data"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["success"],
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": ["session_id", "agent_response"],
+                      "properties": {
+                        "session_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "Session identifier for conversation continuity",
+                          "example": "550e8400-e29b-41d4-a716-446655440000"
+                        },
+                        "agent_response": {
+                          "type": "string",
+                          "description": "AI agent's natural language response",
+                          "example": "I've added a task for 'Buy groceries'. Is there anything else I can help with?"
+                        },
+                        "intent_detected": {
+                          "type": "string",
+                          "description": "Operation intent detected by agent",
+                          "enum": ["add_task", "list_tasks", "complete_task", "update_task", "delete_task", "unclear"],
+                          "example": "add_task"
+                        },
+                        "mcp_tool_executed": {
+                          "type": "string",
+                          "description": "MCP tool that was executed",
+                          "example": "add_task"
+                        },
+                        "tool_result": {
+                          "type": "object",
+                          "description": "Result from MCP tool execution",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                            },
+                            "user_id": {
+                              "type": "string",
+                              "example": "user123"
+                            },
+                            "title": {
+                              "type": "string",
+                              "example": "Buy groceries"
+                            },
+                            "completed": {
+                              "type": "boolean",
+                              "example": false
+                            }
+                          }
+                        },
+                        "requires_confirmation": {
+                          "type": "boolean",
+                          "description": "True if agent needs user confirmation (e.g., for delete operations)",
+                          "example": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "error"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["error"],
+                      "example": "error"
+                    },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_INPUT", "MESSAGE_TOO_LONG"],
+                          "example": "INVALID_INPUT"
+                        },
+                        "message": {
+                          "type": "string",
+                          "example": "Message text is required and must be between 1 and 5000 characters"
+                        },
+                        "details": {
+                          "type": "object",
+                          "description": "Additional error details",
+                          "example": {
+                            "received_length": 5001
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid JWT token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "error"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["error"],
+                      "example": "error"
+                    },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["UNAUTHORIZED"],
+                          "example": "UNAUTHORIZED"
+                        },
+                        "message": {
+                          "type": "string",
+                          "example": "Missing or invalid authentication token"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "error"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["error"],
+                      "example": "error"
+                    },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INTERNAL_ERROR", "AGENT_ERROR", "DATABASE_ERROR"],
+                          "example": "INTERNAL_ERROR"
+                        },
+                        "message": {
+                          "type": "string",
+                          "example": "Failed to process chat message. Please try again."
+                        },
+                        "details": {
+                          "type": "object",
+                          "description": "Additional error details for debugging",
+                          "example": {
+                            "agent_error": "Cohere API timeout",
+                            "tool_error": "MCP tool execution failed"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/history": {
+      "get": {
+        "summary": "Get conversation history",
+        "description": "Retrieve chat history for a session with pagination",
+        "operationId": "get_chat_history",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": true,
+            "description": "Session ID to retrieve history for",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of messages to return (default: 50, max: 100)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Offset for pagination (default: 0)",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chat history retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "data"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["success"],
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": ["session_id", "messages"],
+                      "properties": {
+                        "session_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "Session identifier",
+                          "example": "550e8400-e29b-41d4-a716-446655440000"
+                        },
+                        "messages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": ["id", "message_text", "sender", "created_at"],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                              },
+                              "message_text": {
+                                "type": "string",
+                                "example": "Add a task to buy groceries"
+                              },
+                              "sender": {
+                                "type": "string",
+                                "enum": ["user", "agent"],
+                                "example": "user"
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "example": "2026-02-08T10:00:00Z"
+                              },
+                              "intent_detected": {
+                                "type": "string",
+                                "enum": ["add_task", "list_tasks", "complete_task", "update_task", "delete_task"],
+                                "example": "add_task"
+                              },
+                              "mcp_tool_used": {
+                                "type": "string",
+                                "example": "add_task"
+                              },
+                              "tool_result_summary": {
+                                "type": "string",
+                                "example": "Task created with ID: a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                              }
+                            }
+                          }
+                        },
+                        "total_count": {
+                          "type": "integer",
+                          "description": "Total number of messages in session",
+                          "example": 25
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid JWT token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "error"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["error"],
+                      "example": "error"
+                    },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["UNAUTHORIZED"],
+                          "example": "UNAUTHORIZED"
+                        },
+                        "message": {
+                          "type": "string",
+                          "example": "Missing or invalid authentication token"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found or user does not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "error"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["error"],
+                      "example": "error"
+                    },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["NOT_FOUND"],
+                          "example": "NOT_FOUND"
+                        },
+                        "message": {
+                          "type": "string",
+                          "example": "Chat session not found or you don't have permission to access it"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
+}

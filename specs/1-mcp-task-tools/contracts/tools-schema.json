@@ -1,0 +1,254 @@
+{
+  "schema_version": "1.0.0",
+  "tools": [
+    {
+      "name": "add_task",
+      "description": "Add a new task for the authenticated user",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "User ID from JWT token (extracted by middleware)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Task title",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional task description",
+            "maxLength": 5000
+          }
+        },
+        "required": ["user_id", "title"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["success", "error"]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "description": "Unique task ID" },
+              "user_id": { "type": "string" },
+              "title": { "type": "string" },
+              "description": { "type": ["string", "null"] },
+              "completed": { "type": "boolean", "default": false },
+              "created_at": { "type": "string", "format": "date-time" },
+              "updated_at": { "type": "string", "format": "date-time" }
+            },
+            "required": ["id", "user_id", "title", "completed", "created_at", "updated_at"]
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" },
+              "details": { "type": "object" }
+            }
+          }
+        }
+      },
+      "error_codes": [
+        { "code": "BAD_REQUEST", "status": 400, "reason": "Missing title or invalid parameters" },
+        { "code": "FORBIDDEN", "status": 403, "reason": "Invalid user_id or unauthorized" },
+        { "code": "INTERNAL_ERROR", "status": 500, "reason": "Database or server error" }
+      ]
+    },
+    {
+      "name": "list_tasks",
+      "description": "List all tasks for the authenticated user, optionally filtered by status",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "User ID from JWT token (extracted by middleware)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "completed", "all"],
+            "description": "Filter tasks by completion status (default: all)"
+          }
+        },
+        "required": ["user_id"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["success", "error"]
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "user_id": { "type": "string" },
+                "title": { "type": "string" },
+                "description": { "type": ["string", "null"] },
+                "completed": { "type": "boolean" },
+                "created_at": { "type": "string", "format": "date-time" },
+                "updated_at": { "type": "string", "format": "date-time" }
+              }
+            }
+          },
+          "error": { "type": "object" }
+        }
+      },
+      "error_codes": [
+        { "code": "BAD_REQUEST", "status": 400, "reason": "Invalid status filter" },
+        { "code": "INTERNAL_ERROR", "status": 500, "reason": "Database or server error" }
+      ]
+    },
+    {
+      "name": "complete_task",
+      "description": "Mark a task as completed",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "User ID from JWT token (extracted by middleware)"
+          },
+          "task_id": {
+            "type": "string",
+            "description": "UUID of the task to complete"
+          }
+        },
+        "required": ["user_id", "task_id"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["success", "error"]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "user_id": { "type": "string" },
+              "title": { "type": "string" },
+              "description": { "type": ["string", "null"] },
+              "completed": { "type": "boolean", "const": true },
+              "created_at": { "type": "string", "format": "date-time" },
+              "updated_at": { "type": "string", "format": "date-time" }
+            }
+          },
+          "error": { "type": "object" }
+        }
+      },
+      "error_codes": [
+        { "code": "NOT_FOUND", "status": 404, "reason": "Task not found" },
+        { "code": "FORBIDDEN", "status": 403, "reason": "User does not own this task" },
+        { "code": "INTERNAL_ERROR", "status": 500, "reason": "Database or server error" }
+      ]
+    },
+    {
+      "name": "update_task",
+      "description": "Update task title and/or description",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "User ID from JWT token (extracted by middleware)"
+          },
+          "task_id": {
+            "type": "string",
+            "description": "UUID of the task to update"
+          },
+          "title": {
+            "type": "string",
+            "description": "New task title (optional)",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "description": {
+            "type": "string",
+            "description": "New task description (optional)",
+            "maxLength": 5000
+          }
+        },
+        "required": ["user_id", "task_id"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["success", "error"]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "user_id": { "type": "string" },
+              "title": { "type": "string" },
+              "description": { "type": ["string", "null"] },
+              "completed": { "type": "boolean" },
+              "created_at": { "type": "string", "format": "date-time" },
+              "updated_at": { "type": "string", "format": "date-time" }
+            }
+          },
+          "error": { "type": "object" }
+        }
+      },
+      "error_codes": [
+        { "code": "BAD_REQUEST", "status": 400, "reason": "No fields to update or invalid parameters" },
+        { "code": "NOT_FOUND", "status": 404, "reason": "Task not found" },
+        { "code": "FORBIDDEN", "status": 403, "reason": "User does not own this task" },
+        { "code": "INTERNAL_ERROR", "status": 500, "reason": "Database or server error" }
+      ]
+    },
+    {
+      "name": "delete_task",
+      "description": "Delete a task permanently",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "User ID from JWT token (extracted by middleware)"
+          },
+          "task_id": {
+            "type": "string",
+            "description": "UUID of the task to delete"
+          }
+        },
+        "required": ["user_id", "task_id"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["success", "error"]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "message": { "type": "string", "const": "Task deleted" }
+            }
+          },
+          "error": { "type": "object" }
+        }
+      },
+      "error_codes": [
+        { "code": "NOT_FOUND", "status": 404, "reason": "Task not found" },
+        { "code": "FORBIDDEN", "status": 403, "reason": "User does not own this task" },
+        { "code": "INTERNAL_ERROR", "status": 500, "reason": "Database or server error" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+ui:
+  version: 1.0.0
+  pages:
+    /login:
+      auth: public
+      description: User sign-in
+    /signup:
+      auth: public
+      description: New user registration
+    /dashboard:
+      auth: protected
+      description: Private task list
+  components:
+    TaskDashboard:
+      props:
+        initialTasks: Array<Task>
+    TaskFilter:
+      props:
+        currentFilter: string
+        setFilter: (s: string) => void

@@ -1,0 +1,38 @@
+# =============================================================================
+# Dapr State Store Component - Redis
+# =============================================================================
+# This component configures Dapr to use Redis for ephemeral state storage.
+# Note: This is NOT for persistent data - only for operational state.
+# All task data is stored in PostgreSQL (source of truth).
+# =============================================================================
+
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+  namespace: default
+spec:
+  type: state.redis
+  version: v1
+  metadata:
+  - name: redisHost
+    value: "redis:6379"
+  - name: redisPassword
+    value: ""
+  - name: actorStateStore
+    value: "true"
+  - name: keyPrefixPrefix
+    value: ""
+  - name: maxRetries
+    value: "3"
+  - name: retryWait
+    value: "1s"
+  - name: queryIndexes
+    value: |
+      [
+        {
+          "index": "taskIndex",
+          "key": "$.key"
+        }
+      ]
+initTimeout: 30s

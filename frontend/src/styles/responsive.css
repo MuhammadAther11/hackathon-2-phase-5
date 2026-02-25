@@ -1,0 +1,81 @@
+/* Responsive Breakpoints
+ * Mobile-first approach
+ * Breakpoints: 320px, 768px, 1024px, 1440px
+ */
+
+/* Base: 320px+ (mobile) - Default styles apply here */
+
+/* Tablet: 768px+ */
+@media (min-width: 768px) {
+  /* Two-column layouts */
+  .responsive-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  /* Sidebar becomes visible */
+  .sidebar {
+    display: block;
+  }
+  
+  /* Hide mobile hamburger menu */
+  .mobile-menu-toggle {
+    display: none;
+  }
+}
+
+/* Desktop: 1024px+ */
+@media (min-width: 1024px) {
+  /* Three-column layouts */
+  .responsive-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  /* Fixed sidebar width */
+  .sidebar {
+    width: 280px;
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+  }
+  
+  /* Main content offset for sidebar */
+  .main-content {
+    margin-left: 280px;
+  }
+}
+
+/* Large Desktop: 1440px+ */
+@media (min-width: 1440px) {
+  /* Max-width containers */
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
+  /* Larger font sizes */
+  .text-responsive {
+    font-size: 1.125rem;
+  }
+}
+
+/* Container queries for component-level responsiveness */
+@container (min-width: 400px) {
+  .card-compact {
+    grid-template-columns: auto 1fr;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print,
+  .sidebar,
+  .chatbot-widget {
+    display: none !important;
+  }
+  
+  body {
+    background: white;
+    color: black;
+  }
+}

@@ -1,0 +1,256 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Cohere AI Agent API",
+    "version": "1.0.0",
+    "description": "Natural language chat interface for task management via Cohere AI"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Development server"
+    }
+  ],
+  "paths": {
+    "/api/chat/message": {
+      "post": {
+        "summary": "Send chat message to AI agent",
+        "description": "User sends natural language message; agent detects intent, executes MCP tool, returns conversational response",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000,
+                    "description": "User's natural language message"
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Optional session ID to continue existing conversation"
+                  }
+                },
+                "required": ["message_text"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agent response with tool execution result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "agent_response": {
+                      "type": "string",
+                      "description": "Natural language response from agent"
+                    },
+                    "intent_detected": {
+                      "type": "string",
+                      "enum": ["add_task", "list_tasks", "complete_task", "update_task", "delete_task", "unclear", "general"]
+                    },
+                    "mcp_tool_executed": {
+                      "type": "string",
+                      "description": "Name of MCP tool that was called, if any"
+                    },
+                    "tool_result": {
+                      "type": "object",
+                      "description": "Result from MCP tool execution (structured data)"
+                    },
+                    "requires_confirmation": {
+                      "type": "boolean",
+                      "description": "True if agent is waiting for user confirmation"
+                    }
+                  },
+                  "required": ["session_id", "agent_response"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (missing message_text or invalid format)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing or invalid JWT token)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error (Cohere API, MCP tool, or database failure)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/history": {
+      "get": {
+        "summary": "Retrieve conversation history",
+        "description": "Get recent messages for a session or all user sessions",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Optional session ID to filter messages"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 200
+            },
+            "description": "Maximum number of messages to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation history retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "message_text": {
+                            "type": "string"
+                          },
+                          "sender": {
+                            "type": "string",
+                            "enum": ["user", "agent"]
+                          },
+                          "intent": {
+                            "type": "string"
+                          },
+                          "mcp_tool_used": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["error"]
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object"
+              }
+            },
+            "required": ["code", "message"]
+          }
+        },
+        "required": ["status", "error"]
+      }
+    }
+  }
+}
