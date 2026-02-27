@@ -60,10 +60,9 @@ class TaskEvent(SQLModel, table=True):
         description="Task ID (aggregate root)"
     )
 
-    # User who triggered the event
-    user_id: UUID = Field(
+    # User who triggered the event (stored as string to avoid FK constraint issues with Better Auth user IDs)
+    user_id: str = Field(
         ...,
-        foreign_key="user.id",
         index=True,
         description="User who triggered the event"
     )

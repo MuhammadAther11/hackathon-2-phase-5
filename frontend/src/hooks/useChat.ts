@@ -50,9 +50,17 @@ export function useChat(userId: string, sessionId?: string | null) {
       setIsLoading(true);
       setError(null);
 
-      // Create timestamp once at the start
       const timestamp = new Date().toISOString();
       const tempId = crypto.randomUUID ? crypto.randomUUID() : `temp-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Show user message immediately (optimistic)
+      const userMessage: ChatMessage = {
+        id: `user-${tempId}`,
+        message_text: message,
+        sender: 'user',
+        created_at: timestamp
+      };
+      setMessages(prev => [...prev, userMessage]);
 
       const requestBody: any = {
         message_text: message,
@@ -65,15 +73,7 @@ export function useChat(userId: string, sessionId?: string | null) {
 
       const response: ChatResponse = await apiClient.post('/chat/message', requestBody);
 
-      // Add user message to local state
-      const userMessage: ChatMessage = {
-        id: `user-${tempId}`,
-        message_text: message,
-        sender: 'user',
-        created_at: timestamp
-      };
-
-      // Add agent response to local state
+      // Add agent response once received
       const agentMessage: ChatMessage = {
         id: `agent-${tempId}`,
         message_text: response.agent_response,
@@ -81,7 +81,7 @@ export function useChat(userId: string, sessionId?: string | null) {
         created_at: new Date().toISOString()
       };
 
-      setMessages(prev => [...prev, userMessage, agentMessage]);
+      setMessages(prev => [...prev, agentMessage]);
 
       // If a task-mutating tool ran successfully, refresh the dashboard task list
       if (response.mcp_tool_executed && TASK_MUTATING_TOOLS.includes(response.mcp_tool_executed)) {

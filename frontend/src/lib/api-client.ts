@@ -24,11 +24,15 @@ export async function apiFetch<T = unknown>(endpoint: string, options: RequestIn
   const userId = session?.data?.user?.id;
   const token = session?.data?.token;
 
-  // Protected endpoint prefixes that require authentication
-  const protectedPrefixes = ["/tasks", "/tags", "/search"];
-  const isProtected = protectedPrefixes.some((p) => endpoint.startsWith(p));
+  // Endpoints that need Bearer token injected
+  const authPrefixes = ["/tasks", "/tags", "/search", "/chat"];
+  const isProtected = authPrefixes.some((p) => endpoint.startsWith(p));
 
-  // If no session and trying to access protected endpoints, throw error (don't redirect)
+  // Endpoints that also need /api/{userId} path rewriting (chat uses its own routes)
+  const rewritePrefixes = ["/tasks", "/tags", "/search"];
+  const needsRewrite = rewritePrefixes.some((p) => endpoint.startsWith(p));
+
+  // If no session and trying to access protected endpoints, throw error
   if (!token && isProtected) {
     throw new APIError("Not authenticated. Please log in.", 401);
   }
@@ -42,10 +46,10 @@ export async function apiFetch<T = unknown>(endpoint: string, options: RequestIn
     headers.set("Content-Type", "application/json");
   }
 
-  // Path rewriting: prefix protected endpoints with /api/{userId}
-  // Backend routes: /api/{user_id}/tasks, /api/{user_id}/tags, /api/{user_id}/tasks/search
+  // Path rewriting: only for tasks/tags/search → /api/{userId}/...
+  // Chat endpoints go directly to /chat/... (no rewrite)
   let finalEndpoint = endpoint;
-  if (userId && isProtected) {
+  if (userId && needsRewrite) {
     finalEndpoint = `/api/${userId}${endpoint}`;
   }
   const url = `${API_BASE_URL}${finalEndpoint}`;

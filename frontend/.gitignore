@@ -13,6 +13,7 @@ dist/
 
 # Environment variables
 .env
+.env.local.example
 .env.example
 .env.local
 .env.development.local

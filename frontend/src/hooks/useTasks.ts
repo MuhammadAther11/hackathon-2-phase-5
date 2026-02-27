@@ -85,6 +85,11 @@ export function useTasks(filters?: TaskFilters) {
     }
   });
 
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["tasks", userId] });
+    queryClient.invalidateQueries({ queryKey: ["search"] });
+  };
+
   const updateTask = useMutation({
     mutationFn: ({ id, ...updates }: TaskUpdateInput & { id: string }) =>
       apiFetch(`/tasks/${id}`, {
@@ -92,7 +97,7 @@ export function useTasks(filters?: TaskFilters) {
         body: JSON.stringify(updates),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", userId] });
+      invalidateAll();
       showToast("Task updated successfully", "success");
     },
     onError: (err: unknown) => {
@@ -106,7 +111,7 @@ export function useTasks(filters?: TaskFilters) {
         method: "DELETE",
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", userId] });
+      invalidateAll();
       showToast("Task deleted successfully", "success");
     },
     onError: (err: unknown) => {
@@ -120,7 +125,7 @@ export function useTasks(filters?: TaskFilters) {
         method: "PATCH",
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", userId] });
+      invalidateAll();
       showToast("Task status updated", "success");
     },
     onError: (err: unknown) => {

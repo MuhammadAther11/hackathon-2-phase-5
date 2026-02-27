@@ -50,21 +50,23 @@ def on_startup():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+       allow_origins=[
+        "https://hackathon-2-phase-5-jet.vercel.app",
+        "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # 2. FIXED: Included routers with consistent tagging
-app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+app.include_router(auth_router, prefix="/auth")
 # IMPORTANT: search_router MUST be registered BEFORE tasks_router
 # because /{user_id}/tasks/search would otherwise match /{user_id}/tasks/{id}
-app.include_router(search_router, prefix="/api", tags=["Search"])
-app.include_router(tasks_router, prefix="/api", tags=["Tasks"])
-app.include_router(chat_router, prefix="/chat", tags=["Chat"])
-app.include_router(tags_router, prefix="/api", tags=["Tags"])
-app.include_router(reminders_router, prefix="/api", tags=["Reminders"])
+app.include_router(search_router, prefix="/api")
+app.include_router(tasks_router, prefix="/api")
+app.include_router(chat_router, prefix="/chat")
+app.include_router(tags_router, prefix="/api")
+app.include_router(reminders_router, prefix="/api")
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):

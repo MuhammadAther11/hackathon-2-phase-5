@@ -1,9 +1,12 @@
+import logging
 from sqlmodel import Session, select
 from typing import List, Optional
 from uuid import UUID
 from src.models.task import Task, TaskCreate, TaskUpdate
 from src.models.task_tag import TaskTag
 from .event_publisher import event_publisher
+
+logger = logging.getLogger(__name__)
 
 
 def get_user_tasks(*, session: Session, user_id: str) -> List[Task]:
@@ -51,8 +54,8 @@ async def create_task(*, session: Session, task_create: TaskCreate, user_id: str
                 "version": task.version,
             }
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[task_service] event publish failed: {e}")
 
     return task
 
@@ -115,8 +118,8 @@ async def update_task(*, session: Session, task_id: UUID, task_update: TaskUpdat
                 "version": db_task.version,
             }
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[task_service] event publish failed: {e}")
 
     return db_task
 
@@ -140,8 +143,8 @@ async def delete_task(*, session: Session, task_id: UUID, user_id: str) -> bool:
                 "status": db_task.status,
             }
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[task_service] event publish failed: {e}")
 
     return True
 
@@ -174,7 +177,7 @@ async def toggle_task_completion(*, session: Session, task_id: UUID, user_id: st
                 "completed": db_task.completed,
             }
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[task_service] event publish failed: {e}")
 
     return db_task

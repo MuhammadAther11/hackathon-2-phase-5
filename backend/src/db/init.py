@@ -27,6 +27,7 @@ async def create_all_tables(engine: AsyncEngine) -> None:
     Tables created:
     - tasks (with indexes: PRIMARY (id), idx_user_tasks(user_id, completed),
              idx_user_created(user_id, created_at DESC), idx_updated(updated_at DESC))
+    - reminder (reminder notifications with indexes)
 
     Args:
         engine: AsyncEngine instance for database connection
@@ -36,8 +37,9 @@ async def create_all_tables(engine: AsyncEngine) -> None:
     """
     try:
         async with engine.begin() as conn:
-            # Import Task model to register it with SQLModel.metadata
+            # Import all models to register them with SQLModel.metadata
             from src.models.task import Task  # noqa: F401
+            from src.models.reminder import Reminder  # noqa: F401
 
             # Create all tables defined in SQLModel.metadata
             await conn.run_sync(SQLModel.metadata.create_all)

@@ -51,10 +51,12 @@ Thumbs.db
 nul
 .vercel
 
+
 /backend/.env
 /backend/.env.example
 /backend/.env.docker
 /frontend/.env
+/frontend/.env.local.example
 /frontend/.env.local
 
 .env.docker

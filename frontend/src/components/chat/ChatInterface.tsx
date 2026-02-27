@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChatHistory } from './ChatHistory';
 import { ChatInput } from './ChatInput';
 import { useChat } from '@/hooks/useChat';
@@ -11,11 +11,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface ChatInterfaceProps {
   userId: string;
   className?: string;
+  onSendRef?: React.MutableRefObject<((text: string) => void) | null>;
 }
 
-export function ChatInterface({ userId, className }: ChatInterfaceProps) {
+export function ChatInterface({ userId, className, onSendRef }: ChatInterfaceProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const { messages, sendChatMessage, isLoading, error, setError } = useChat(userId, sessionId);
+
+  // Expose handleSendMessage to parent via ref (used by quick command chips)
+  useEffect(() => {
+    if (onSendRef) {
+      onSendRef.current = (text: string) => handleSendMessage(text);
+    }
+  });
 
   const handleSendMessage = async (text: string) => {
     try {

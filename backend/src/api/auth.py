@@ -13,7 +13,7 @@ from src.models.user import UserCreate, UserPublic
 from src.services.user_service import create_user, authenticate_user, EmailAlreadyExistsError, PasswordTooLongError
 from src.auth.jwt import SECRET_KEY, ALGORITHM
 
-router = APIRouter(tags=["auth"])
+router = APIRouter(tags=["Authentication"])
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 

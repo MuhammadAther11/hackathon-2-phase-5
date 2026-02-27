@@ -398,8 +398,10 @@ class IntentDetector:
         # Every X days/weeks/months
         interval_match = re.search(r"\bevery\s+(\d+)\s+(day|week|month)s?\b", message_lower)
         if interval_match:
+            unit = interval_match.group(2)
+            freq_map = {"day": "daily", "week": "weekly", "month": "monthly"}
             return {
-                "frequency": f"{interval_match.group(2)}ly",
+                "frequency": freq_map.get(unit, f"{unit}ly"),
                 "interval": int(interval_match.group(1))
             }
         

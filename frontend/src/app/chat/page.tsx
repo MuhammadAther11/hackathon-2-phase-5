@@ -5,7 +5,7 @@ import { ChatInterface } from "@/components/chat/ChatInterface";
 import { TaskDashboard } from "@/components/TaskDashboard";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
@@ -63,6 +63,7 @@ export default function ChatPage() {
   const [showTasks, setShowTasks] = useState(false);
   const { data: session, isLoading } = useSession();
   const router = useRouter();
+  const sendMessageRef = useRef<((text: string) => void) | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -172,19 +173,21 @@ export default function ChatPage() {
           {quickCommands.map((cmd) => {
             const Icon = cmd.icon;
             return (
-              <motion.span
+              <motion.button
                 key={cmd.label}
                 variants={chipVariant}
+                type="button"
+                onClick={() => sendMessageRef.current?.(cmd.label)}
                 className={cn(
                   "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium",
                   "bg-card border border-border shadow-sm",
                   "hover:shadow-md hover:border-primary/30 hover:scale-[1.03]",
-                  "transition-all duration-200 cursor-default select-none",
+                  "transition-all duration-200 cursor-pointer select-none",
                 )}
               >
                 <Icon className={cn("h-3.5 w-3.5", cmd.color)} />
                 {cmd.label}
-              </motion.span>
+              </motion.button>
             );
           })}
         </motion.div>
@@ -230,6 +233,7 @@ export default function ChatPage() {
             <ChatInterface
               userId={session.user.id}
               className="h-[calc(100vh-280px)] sm:h-[calc(100vh-300px)] lg:h-[calc(100vh-220px)]"
+              onSendRef={sendMessageRef}
             />
           </motion.div>
 
