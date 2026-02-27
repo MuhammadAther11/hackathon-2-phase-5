@@ -113,7 +113,7 @@ function Dropdown({ value, options, onChange, icon, placeholder }: DropdownProps
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute z-[100] top-full mt-1.5 left-0 min-w-[180px] max-w-[calc(100vw-2rem)] py-1.5 rounded-xl border border-border/80 bg-white dark:bg-[#1a1f2e] shadow-xl shadow-black/8 dark:shadow-black/30 backdrop-blur-xl"
+            className="absolute z-[9999] top-full mt-1.5 left-0 min-w-[180px] max-w-[calc(100vw-2rem)] py-1.5 rounded-xl border border-border/80 bg-white dark:bg-[#1a1f2e] shadow-xl shadow-black/8 dark:shadow-black/30"
           >
             {options.map((opt) => {
               const isActive = String(opt.value) === String(value);
@@ -226,9 +226,9 @@ export function TaskFilterBar({ filters, onFiltersChange }: TaskFilterBarProps) 
   ];
 
   return (
-    <div className="space-y-2">
+    <div className="relative space-y-2">
       {/* Main filter bar */}
-      <div className="glass-card rounded-xl sm:rounded-2xl border border-border/60">
+      <div className="rounded-xl sm:rounded-2xl border border-border/60 bg-white/60 dark:bg-[#161b22]/75 dark:border-[#30363d]/80">
         <div className="px-3 py-2.5 sm:px-4 sm:py-3">
           {/* Desktop layout */}
           <div className="hidden md:flex items-center gap-2.5 flex-wrap">

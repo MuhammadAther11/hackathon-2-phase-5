@@ -1,11 +1,11 @@
   
-   # hackathon-2-phase-4
+   # hackathon-2-phase-5
 
 # TaskFlow - AI-Powered Task Management (Cloud-Native)
 
 An intelligent task management application that lets you manage your todos through natural language conversation. Built with an AI chatbot powered by OpenAI Agents SDK and MCP (Model Context Protocol) tools, backed by a FastAPI backend and Neon Serverless PostgreSQL.
 
-**Phase IV** adds cloud-native deployment: the entire application is containerized with Docker and deployed to a local Minikube Kubernetes cluster via Helm charts, with all infrastructure managed by AI agents (kubectl-ai, kagent, Gordon).
+**Phase V** introduces advanced features: event sourcing for audit trails, reminder scheduling with natural language support, priority management, recurring tasks, and tag-based organization. The application remains containerized with Docker and deployable to Minikube Kubernetes clusters via Helm charts.
 
 ## Live Demo & Links
 

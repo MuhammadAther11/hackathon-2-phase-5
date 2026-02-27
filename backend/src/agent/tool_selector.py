@@ -22,7 +22,7 @@ class ToolSelector:
         IntentType.DELETE_TASK: "delete_task",
         IntentType.SET_PRIORITY: "update_task",
         IntentType.SET_DUE_DATE: "update_task",
-        IntentType.SET_REMINDER: "update_task",
+        IntentType.SET_REMINDER: "set_reminder",
         IntentType.SET_RECURRING: "update_task",
         IntentType.ADD_TAGS: "update_task",
         IntentType.VIEW_REMINDERS: "list_tasks",

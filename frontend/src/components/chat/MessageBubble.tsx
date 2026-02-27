@@ -118,7 +118,21 @@ function renderFormattedText(text: string) {
       return <div key={i} className="h-2" />;
     }
 
-    // Normal text
-    return <span key={i}>{line}{i < lines.length - 1 ? '\n' : ''}</span>;
+    // Normal text — render **bold** inline
+    return <span key={i}>{renderBold(line)}{i < lines.length - 1 ? '\n' : ''}</span>;
+  });
+}
+
+/**
+ * Parse **bold** markers within a single line and return mixed text/bold spans.
+ */
+function renderBold(line: string) {
+  const parts = line.split(/(\*\*[^*]+\*\*)/g);
+  if (parts.length === 1) return line;
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
+    }
+    return part;
   });
 }

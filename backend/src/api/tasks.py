@@ -17,7 +17,7 @@ from src.services.task_service import (
     toggle_task_completion
 )
 
-router = APIRouter(tags=["tasks"])
+router = APIRouter(tags=["Tasks"])
 
 def load_task_with_tags(task: Task, session: Session) -> dict:
     """Load tags for a task and return as dict."""

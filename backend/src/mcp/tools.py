@@ -98,11 +98,11 @@ class TaskToolResponse:
         return dt.astimezone(PKT).isoformat()
 
     @staticmethod
-    def task_to_dict(task) -> Dict[str, Any]:
+    def task_to_dict(task, reminder=None) -> Dict[str, Any]:
         """Convert Task SQLModel to JSON-serializable dict with PKT timestamps."""
         if task is None:
             return None
-        return {
+        d = {
             "id": str(task.id),
             "user_id": task.user_id,
             "title": task.title,
@@ -114,7 +114,15 @@ class TaskToolResponse:
             "recurrence_rule": getattr(task, "recurrence_rule", None),
             "created_at": TaskToolResponse._to_pkt(task.created_at),
             "updated_at": TaskToolResponse._to_pkt(task.updated_at),
+            "reminder": None,
         }
+        if reminder:
+            d["reminder"] = {
+                "id": str(reminder.id),
+                "trigger_time": TaskToolResponse._to_pkt(reminder.trigger_time),
+                "delivered": reminder.delivered,
+            }
+        return d
 
 
 async def list_tasks_tool(session, user_id: str, status: Optional[str] = None) -> Dict[str, Any]:
@@ -143,6 +151,8 @@ async def list_tasks_tool(session, user_id: str, status: Optional[str] = None) -
         # Import here to avoid circular imports
         from src.services.task_service import get_user_tasks
         from src.models.task import Task
+        from src.models.reminder import Reminder
+        from sqlmodel import select
 
         # Get all tasks for user
         tasks = get_user_tasks(session=session, user_id=user_id)
@@ -153,8 +163,23 @@ async def list_tasks_tool(session, user_id: str, status: Optional[str] = None) -
         elif status == "completed":
             tasks = [t for t in tasks if t.completed]
 
+        # Fetch reminders for all tasks in one query
+        task_ids = [t.id for t in tasks]
+        reminders_by_task = {}
+        if task_ids:
+            reminder_rows = session.exec(
+                select(Reminder)
+                .where(Reminder.task_id.in_(task_ids))
+                .where(Reminder.delivered == False)
+                .order_by(Reminder.trigger_time.asc())
+            ).all()
+            for r in reminder_rows:
+                # Keep only the earliest upcoming reminder per task
+                if str(r.task_id) not in reminders_by_task:
+                    reminders_by_task[str(r.task_id)] = r
+
         # Convert to JSON-serializable format
-        result = [TaskToolResponse.task_to_dict(t) for t in tasks]
+        result = [TaskToolResponse.task_to_dict(t, reminders_by_task.get(str(t.id))) for t in tasks]
 
         logger.info(f"[list_tasks] user_id={user_id} status={status} count={len(result)}")
         return TaskToolResponse.success(result)
@@ -520,6 +545,136 @@ async def delete_task_tool(session, user_id: str, task_id: str) -> Dict[str, Any
         )
 
 
+async def set_reminder_tool(
+    session,
+    user_id: str,
+    task_id: str,
+    trigger_time: str,
+    update_due_date: bool = True
+) -> Dict[str, Any]:
+    """
+    Set a reminder for a task at a specific time.
+    Optionally also updates the task's due_date to match the reminder time.
+
+    Args:
+        session: AsyncSession for database access
+        user_id: User ID from JWT (enforces user isolation)
+        task_id: UUID of the task to set reminder for
+        trigger_time: When to trigger the reminder (ISO datetime or natural language)
+        update_due_date: If True, also update the task's due_date field
+
+    Returns:
+        {status: "success", data: {message: "Reminder set", reminder_id: "..."}}
+        or {status: "error", error: {code, message, details}}
+    """
+    try:
+        from sqlmodel import text
+        from uuid import uuid4
+
+        # Parse task_id
+        try:
+            task_uuid = UUID(task_id)
+        except (ValueError, TypeError):
+            logger.warning(f"[set_reminder] user_id={user_id} invalid_task_id={task_id}")
+            return TaskToolResponse.error(
+                "INVALID_TASK_ID",
+                f"Invalid task ID format: {task_id}",
+                {"received": task_id}
+            )
+
+        # Parse trigger_time - try ISO format first, then natural language
+        trigger_dt: Optional[datetime] = None
+
+        # Try parsing as ISO format
+        try:
+            # Handle both with and without timezone
+            if "T" in trigger_time:
+                trigger_dt = datetime.fromisoformat(trigger_time.replace("Z", "+00:00"))
+            else:
+                # Try natural language parsing
+                trigger_dt = _parse_natural_language_date(trigger_time)
+        except (ValueError, TypeError):
+            # Try natural language parsing
+            trigger_dt = _parse_natural_language_date(trigger_time)
+
+        if trigger_dt is None:
+            # Default to tomorrow if parsing fails
+            trigger_dt = datetime.now(PKT) + timedelta(days=1)
+            trigger_dt = trigger_dt.replace(hour=9, minute=0, second=0, microsecond=0)
+
+        # Ensure trigger_dt has timezone info
+        if trigger_dt.tzinfo is None:
+            trigger_dt = trigger_dt.replace(tzinfo=PKT)
+
+        # Verify task exists and belongs to user
+        from src.models.task import Task
+        task_result = session.execute(
+            text("SELECT id, title FROM tasks WHERE id = :id AND user_id = :user_id"),
+            {"id": str(task_uuid), "user_id": user_id}
+        ).first()
+
+        if not task_result:
+            logger.warning(f"[set_reminder] user_id={user_id} task_not_found_or_not_owned task_id={task_id}")
+            return TaskToolResponse.error(
+                "NOT_FOUND",
+                "Task not found or user does not own this task",
+                {"task_id": task_id}
+            )
+
+        # Create reminder in the reminder table
+        reminder_id = uuid4()
+        session.execute(
+            text("""
+                INSERT INTO reminder (id, task_id, trigger_time, delivered, created_at)
+                VALUES (:id, :task_id, :trigger_time, FALSE, :created_at)
+            """),
+            {
+                "id": str(reminder_id),
+                "task_id": str(task_uuid),
+                "trigger_time": trigger_dt,
+                "created_at": datetime.now(timezone.utc)
+            }
+        )
+
+        # Optionally update the task's due_date to match the reminder
+        if update_due_date:
+            session.execute(
+                text("""
+                    UPDATE tasks SET due_date = :due_date, updated_at = :updated_at
+                    WHERE id = :id AND user_id = :user_id
+                """),
+                {
+                    "due_date": trigger_dt,
+                    "updated_at": datetime.now(timezone.utc),
+                    "id": str(task_uuid),
+                    "user_id": user_id
+                }
+            )
+
+        session.commit()
+
+        task_title = task_result.title if task_result else None
+        logger.info(f"[set_reminder] user_id={user_id} task_id={task_id} trigger_time={trigger_dt.isoformat()}")
+        return TaskToolResponse.success({
+            "message": "Reminder set successfully",
+            "reminder_id": str(reminder_id),
+            "trigger_time": TaskToolResponse._to_pkt(trigger_dt),
+            "task_title": task_title,
+        })
+
+    except Exception as e:
+        logger.error(f"[set_reminder] user_id={user_id} task_id={task_id} error={str(e)}")
+        try:
+            session.rollback()
+        except Exception:
+            pass
+        return TaskToolResponse.error(
+            "INTERNAL_ERROR",
+            "Failed to set reminder",
+            {"error": str(e)}
+        )
+
+
 # Tool registry for MCP server discovery
 TASK_TOOLS = {
     "list_tasks": {
@@ -629,5 +784,32 @@ TASK_TOOLS = {
             "required": ["user_id", "task_id"]
         },
         "handler": delete_task_tool
+    },
+    "set_reminder": {
+        "name": "set_reminder",
+        "description": "Set a reminder for a task at a specific time. Also updates the task's due_date to match the reminder time.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "user_id": {
+                    "type": "string",
+                    "description": "User ID from JWT token"
+                },
+                "task_id": {
+                    "type": "string",
+                    "description": "UUID of the task to set reminder for"
+                },
+                "trigger_time": {
+                    "type": "string",
+                    "description": "When to trigger reminder (ISO datetime or natural language)"
+                },
+                "update_due_date": {
+                    "type": "boolean",
+                    "description": "Whether to also update the task's due_date (default: true)"
+                }
+            },
+            "required": ["user_id", "task_id", "trigger_time"]
+        },
+        "handler": set_reminder_tool
     }
 }

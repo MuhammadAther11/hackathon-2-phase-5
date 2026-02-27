@@ -48,6 +48,7 @@ class MCPExecutor:
                 complete_task_tool,
                 update_task_tool,
                 delete_task_tool,
+                set_reminder_tool,
             )
 
             # Map tool name to handler
@@ -57,6 +58,7 @@ class MCPExecutor:
                 "complete_task": complete_task_tool,
                 "update_task": update_task_tool,
                 "delete_task": delete_task_tool,
+                "set_reminder": set_reminder_tool,
             }
 
             handler = tool_map.get(tool_name)
@@ -156,6 +158,13 @@ class MCPExecutor:
                 # For reminders, we set due_date if not already set
                 if "due_date" not in parameters:
                     tool_args["due_date"] = parameters["reminder_time"]
+
+        elif tool_name == "set_reminder":
+            tool_args["task_id"] = self._resolve_task_id(parameters, user_id=user_id)
+            # Map reminder_time to trigger_time (the tool expects trigger_time)
+            tool_args["trigger_time"] = parameters.get("reminder_time") or parameters.get("due_date")
+            # Always update the task's due_date when setting a reminder
+            tool_args["update_due_date"] = True
 
         elif tool_name == "delete_task":
             tool_args["task_id"] = self._resolve_task_id(parameters, user_id=user_id)

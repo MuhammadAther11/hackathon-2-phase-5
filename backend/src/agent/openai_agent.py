@@ -8,6 +8,7 @@ and executes them with proper error handling.
 from typing import Dict, Any, Optional
 import logging
 import os
+import re
 
 from .schemas import AgentResponse, IntentType
 from .intent_detector import IntentDetector
@@ -102,6 +103,10 @@ class OpenAIAgent:
                     response_text=response_text
                 )
 
+            # Step 3.5: Check for combined intents (e.g., "Update task X and remind me tomorrow")
+            # Detect if message also contains reminder keywords
+            combined_reminder = self._detect_combined_reminder(message, intent, parameters)
+
             # Step 4: Select tool
             tool_name, error_message = self.tool_selector.select_tool(intent, confidence, parameters)
 
@@ -127,6 +132,7 @@ class OpenAIAgent:
             # For Phase III MVP, we execute immediately and rely on frontend for confirmation UI
             tool_result = None
             response_text = confirmation_text
+            combined_reminder_result = None
 
             if tool_name:
                 tool_result = await self.mcp_executor.execute_tool(
@@ -140,6 +146,22 @@ class OpenAIAgent:
                     response_text = self._format_success_response(
                         intent, tool_name, tool_result, parameters
                     )
+                    
+                    # Step 7.5: Handle combined reminder if detected
+                    if combined_reminder:
+                        logger.info(f"[openai_agent] executing_combined_reminder params={combined_reminder}")
+                        combined_reminder_result = await self.mcp_executor.execute_tool(
+                            tool_name="set_reminder",
+                            user_id=user_id,
+                            parameters=combined_reminder
+                        )
+                        
+                        if combined_reminder_result.get("status") == "success":
+                            # Append reminder confirmation to response
+                            reminder_time = combined_reminder.get("reminder_time", "the specified time")
+                            response_text += f" Also, I'll remind you at {reminder_time}."
+                        else:
+                            logger.warning(f"[openai_agent] combined_reminder_failed result={combined_reminder_result}")
                 else:
                     # Tool execution failed
                     error_message = self.error_handler.handle_tool_error(
@@ -254,7 +276,26 @@ class OpenAIAgent:
                         due_label = f" — due {dt.strftime('%b %d')}"
                     except Exception:
                         due_label = f" — due {due[:10]}"
-                return f"{i+1}. {icon} {title}{pri_label}{due_label}"
+                reminder = t.get('reminder')
+                reminder_label = ""
+                if reminder and not reminder.get('delivered'):
+                    rt = reminder.get('trigger_time')
+                    if rt:
+                        try:
+                            from datetime import datetime
+                            rdt = datetime.fromisoformat(rt)
+                            reminder_label = f" [reminder: {rdt.strftime('%b %d %I:%M %p')}]"
+                        except Exception:
+                            reminder_label = f" [reminder set]"
+                recurrence = t.get('recurrence_rule')
+                recur_label = ""
+                if recurrence:
+                    freq = recurrence.get('frequency', '')
+                    interval = recurrence.get('interval', 1)
+                    unit_map = {"daily": "day", "weekly": "week", "monthly": "month"}
+                    unit = unit_map.get(freq, freq)
+                    recur_label = f" [repeats every {interval} {unit}{'s' if interval > 1 else ''}]"
+                return f"{i+1}. {icon} {title}{pri_label}{due_label}{reminder_label}{recur_label}"
 
             task_list = "\n".join([_task_line(i, t) for i, t in enumerate(tasks)])
             return f"Here are your {count} {status} task(s):\n{task_list}"
@@ -306,14 +347,33 @@ class OpenAIAgent:
                 return f"Done! '{title}' is now due {due_date}."
             
             elif intent == IntentType.SET_REMINDER:
-                reminder_time = parameters.get("reminder_time", "a time")
+                # data for set_reminder is {message, reminder_id, trigger_time, task_title}
+                reminder_time = parameters.get("reminder_time") or data.get("trigger_time", "the scheduled time")
+                task_index = parameters.get("task_index")
+                task_identifier = parameters.get("task_identifier")
+
+                # Prefer task_title from tool response, then parameters, then fallback
+                if data.get("task_title"):
+                    title = data["task_title"]
+                elif task_index:
+                    title = f"task #{task_index}"
+                elif task_identifier:
+                    title = task_identifier
+                else:
+                    title = "your task"
+
                 return f"Done! I'll remind you about '{title}' at {reminder_time}."
             
             elif intent == IntentType.SET_RECURRING:
                 recurrence = parameters.get("recurrence_rule", {})
                 freq = recurrence.get("frequency", "regular")
                 interval = recurrence.get("interval", 1)
-                repeat_text = f"{freq}" + (f" every {interval} {freq.rstrip('ly')}s" if interval > 1 else "")
+                unit_map = {"daily": "day", "weekly": "week", "monthly": "month"}
+                unit = unit_map.get(freq, freq)
+                if interval > 1:
+                    repeat_text = f"every {interval} {unit}s"
+                else:
+                    repeat_text = freq
                 return f"Done! '{title}' will now repeat {repeat_text}."
             
             elif intent == IntentType.ADD_TAGS:
@@ -357,3 +417,65 @@ class OpenAIAgent:
             IntentType.DELETE_TASK: "Done! What else can I help with?",
         }
         return suggestions.get(intent)
+
+    def _detect_combined_reminder(
+        self,
+        message: str,
+        primary_intent: IntentType,
+        parameters: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Detect if message also contains a reminder request alongside primary intent.
+        
+        Handles combined intents like:
+        - "Update task #1 and remind me tomorrow"
+        - "Set task #2 priority to high and remind me next week"
+        - "Change task #3 description and remind me on 12/31"
+        
+        Args:
+            message: Original user message
+            primary_intent: Primary detected intent
+            parameters: Parameters from primary intent
+            
+        Returns:
+            Reminder parameters if combined reminder detected, None otherwise
+        """
+        # Only check for combined reminders with task-modifying intents
+        if primary_intent not in [IntentType.UPDATE_TASK, IntentType.SET_PRIORITY, IntentType.SET_DUE_DATE, IntentType.ADD_TAGS]:
+            return None
+        
+        # Check for reminder keywords
+        reminder_keywords = [
+            r"\bremind\s+me\b",
+            r"\breminder\b",
+            r"\bset\s+a\s+reminder\b",
+        ]
+        
+        has_reminder = any(re.search(kw, message, re.IGNORECASE) for kw in reminder_keywords)
+        if not has_reminder:
+            return None
+        
+        # Extract reminder time
+        from .intent_detector import IntentDetector
+        reminder_time = IntentDetector._extract_due_date(message)
+        
+        if not reminder_time:
+            return None
+        
+        # Extract task identifier (use same as primary intent if not specified for reminder)
+        task_id = parameters.get("task_id")
+        task_index = parameters.get("task_index")
+        task_identifier = parameters.get("task_identifier")
+        
+        # Check if reminder specifies a different task
+        reminder_numbers = re.findall(r"#?(\d+)", message)
+        if reminder_numbers:
+            # Use the last number found (likely for reminder)
+            task_index = int(reminder_numbers[-1])
+        
+        return {
+            "reminder_time": reminder_time,
+            "task_id": task_id,
+            "task_index": task_index,
+            "task_identifier": task_identifier,
+        }

@@ -73,6 +73,9 @@ class AuthClient {
 
       // Also set as cookie for server-side middleware
       document.cookie = `auth_token=${token}; path=/; max-age=86400`;
+
+      // Notify all useSession hooks in the current tab
+      window.dispatchEvent(new Event("auth-session-changed"));
     }
   }
 
@@ -87,6 +90,9 @@ class AuthClient {
 
       // Also clear the cookie
       document.cookie = "auth_token=; path=/; max-age=0";
+
+      // Notify all useSession hooks in the current tab
+      window.dispatchEvent(new Event("auth-session-changed"));
     }
   }
 
@@ -223,7 +229,6 @@ export function useSession() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Mark component as mounted
     setMounted(true);
 
     const checkSession = () => {
@@ -234,14 +239,15 @@ export function useSession() {
 
     checkSession();
 
-    // Listen for storage changes (for multi-tab support)
-    const handleStorageChange = () => {
-      checkSession();
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener("storage", handleStorageChange);
-      return () => window.removeEventListener("storage", handleStorageChange);
+    if (typeof window !== "undefined") {
+      // Same-tab logout/login: fired by clearSession() and saveSession()
+      window.addEventListener("auth-session-changed", checkSession);
+      // Cross-tab support: fires when another tab changes localStorage
+      window.addEventListener("storage", checkSession);
+      return () => {
+        window.removeEventListener("auth-session-changed", checkSession);
+        window.removeEventListener("storage", checkSession);
+      };
     }
   }, []);
 
