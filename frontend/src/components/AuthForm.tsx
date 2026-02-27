@@ -177,13 +177,21 @@ export function AuthForm({ type }: AuthFormProps) {
 
     try {
       if (isLogin) {
-        const { error: authError } = await signIn.email({
+        const result = await signIn.email({
           email,
           password,
         });
-        if (authError) throw authError;
+        if (result.error) throw result.error;
+
+        // Wait for session to be saved and propagated
+        await new Promise(resolve => setTimeout(resolve, 300));
+
         showToast("Welcome back! Redirecting to dashboard...", "success");
-        setTimeout(() => router.push("/dashboard"), 800);
+
+        // Use window.location.href for a full page reload to ensure
+        // the session is properly loaded from localStorage/cookies
+        // This fixes the issue where the dashboard loads before session is ready
+        window.location.href = "/dashboard";
       } else {
         const { error: authError } = await signUp.email({
           email,

@@ -162,8 +162,26 @@ const sectionVariants = {
 
 export default function DashboardPage() {
   const { allTasks: tasks } = useTasks();
-  const { data: session } = useSession();
+  const { data: session, isLoading } = useSession();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Show loading state while session is being loaded
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-indigo-200 dark:border-indigo-900 border-t-indigo-600 dark:border-t-indigo-400 rounded-full animate-spin" />
+          <p className="text-muted-foreground text-sm">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!session) {
+    window.location.href = "/login";
+    return null;
+  }
 
   // ------ Derived stats ------
   const totalTasks = tasks?.length ?? 0;
